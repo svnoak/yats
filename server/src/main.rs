@@ -2,17 +2,42 @@ use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path,
+        Query,
     },
-    response::IntoResponse,
+    http::StatusCode,
+    response::{IntoResponse},
     routing::{get},
     Router,
 };
 use tokio::net::TcpListener;
+use serde::Deserialize;
+use axum_extra::{headers::Authorization, TypedHeader};
 use tracing::{info, error};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use axum::extract::State;
+use std::sync::Arc;
+use dotenvy::dotenv;
+use std::env;
+
+#[derive(Debug, Deserialize)]
+struct ClientParams {
+    client_id: String,
+}
+
+#[derive(Clone)]
+struct AppState {
+    secret_token: String,
+    // ... (will add active_websockets here later)
+}
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    let secret_token = env::var("SECRET_TOKEN")
+        .expect("SECRET_TOKEN must be set in .env file or environment");
+
+    let app_state = Arc::new(AppState { secret_token, /* ... */ });
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -24,8 +49,9 @@ async fn main() {
     info!("Starting Simplified Rust Tunnel Server...");
 
     let app = Router::new()
+        .route("/ws", get(ws_handler))
         .route("/*path", get(get_handler))
-        .route("/ws", get(ws_handler));
+        .with_state(app_state);
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("Listening on {}", listener.local_addr().unwrap());
@@ -39,8 +65,27 @@ async fn get_handler(
     format!("You requested the path: '{}'", path_segment)
 }
 
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    Query(params): Query<ClientParams>,
+    auth_header: Option<TypedHeader<Authorization<axum_extra::headers::authorization::Bearer>>>,
+    State(app_state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     info!("Attempting to upgrade connection to WebSocket on /ws");
+    let auth_header: Authorization<headers::authorization::Bearer> = if let Some(TypedHeader(auth_header)) = auth_header {
+        auth_header
+    } else {
+        error!("Missing Authorization header");
+        return (axum::http::StatusCode::UNAUTHORIZED, "Missing Authorization header").into_response();
+    };
+
+    if auth_header.token() != app_state.secret_token {
+        error!("Invalid token provided: {}", auth_header.token());
+        return (StatusCode::FORBIDDEN, "Invalid token").into_response();
+    }
+
+    info!("WebSocket connection authorized for client_id: {}", params.client_id);
+
     ws.on_upgrade(handle_single_websocket)
 }
 
