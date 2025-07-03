@@ -1,0 +1,18 @@
+[package]
+name = "yats-client"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = "0.27.0"
+url = "2.5"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-util = "0.3"
+http = "0.2"
+rand = "0.8"

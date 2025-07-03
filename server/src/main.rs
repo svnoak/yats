@@ -63,6 +63,7 @@ async fn get_handler(
 ) -> impl IntoResponse {
     info!("Received request on path: /dynamic/{}", path_segment);
     format!("You requested the path: '{}'", path_segment)
+    
 }
 
 async fn ws_handler(
