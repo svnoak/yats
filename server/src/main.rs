@@ -23,6 +23,7 @@ use base64::Engine;
 use dashmap::DashMap;
 use std::collections::HashMap;
 use uuid::Uuid;
+use tokio::sync::oneshot;
 
 #[derive(Debug, Deserialize)]
 struct ClientParams {
@@ -33,6 +34,7 @@ struct ClientParams {
 struct AppState {
     secret_token: String,
     active_websockets: Arc<DashMap<String, tokio::sync::mpsc::Sender<Message>>>,
+    pending_responses: Arc<DashMap<String, oneshot::Sender<TunneledHttpResponse>>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -42,7 +44,15 @@ struct TunneledRequest {
     path: String,
     headers: HashMap<String, String>,
     query_params: HashMap<String, String>,
-    body: String, // base64 encoded
+    body: String,
+}
+
+#[derive(serde::Deserialize, Debug)]
+struct TunneledHttpResponse {
+    id: String,
+    status: u16,
+    headers: HashMap<String, String>,
+    body: Option<String>, // base64 encoded
 }
 
 #[tokio::main]
@@ -54,6 +64,7 @@ async fn main() {
     let app_state = Arc::new(AppState {
         secret_token,
         active_websockets: Arc::new(DashMap::new()),
+        pending_responses: Arc::new(DashMap::new()),
     });
 
     tracing_subscriber::registry()
@@ -101,8 +112,9 @@ async fn handle_forwarding_request(
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or_default().to_string()))
             .collect();
 
+        let request_id = Uuid::new_v4().to_string();
         let tunneled_request = TunneledRequest {
-            id: Uuid::new_v4().to_string(),
+            id: request_id.clone(),
             method: method.to_string(),
             path: forward_path,
             headers: headers_map,
@@ -110,20 +122,42 @@ async fn handle_forwarding_request(
             body: general_purpose::STANDARD.encode(body),
         };
 
+        let (tx, rx) = oneshot::channel();
+        app_state.pending_responses.insert(request_id.clone(), tx);
+
         match serde_json::to_string(&tunneled_request) {
             Ok(json_payload) => {
                 if let Err(e) = ws_sender.send(Message::Text(json_payload)).await {
                     error!("Failed to send request to websocket: {}", e);
+                    app_state.pending_responses.remove(&request_id);
                     return (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         "Failed to forward request to client",
                     )
                         .into_response();
                 }
-                (StatusCode::OK, "Request forwarded").into_response()
+
+                match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx).await {
+                    Ok(Ok(response)) => {
+                        let mut builder = axum::response::Response::builder()
+                            .status(StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR));
+                        
+                        for (key, value) in response.headers {
+                            builder = builder.header(key, value);
+                        }
+
+                        let body = response.body.and_then(|b| general_purpose::STANDARD.decode(b).ok());
+                        builder.body(axum::body::Body::from(body.unwrap_or_default())).unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to build response").into_response())
+                    }
+                    Ok(Err(_)) | Err(_) => {
+                        app_state.pending_responses.remove(&request_id);
+                        (StatusCode::GATEWAY_TIMEOUT, "Request to client timed out").into_response()
+                    }
+                }
             }
             Err(e) => {
                 error!("Failed to serialize request: {}", e);
+                app_state.pending_responses.remove(&request_id);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Failed to serialize request",
@@ -216,11 +250,16 @@ async fn handle_single_websocket(
                 match msg {
                     Message::Text(text) => {
                         info!("Received text from WebSocket: {}", text);
-                        // Here you would handle responses from the client
+                        if let Ok(response) = serde_json::from_str::<TunneledHttpResponse>(&text) {
+                            if let Some((_, tx)) = app_state.pending_responses.remove(&response.id) {
+                                if tx.send(response).is_err() {
+                                    error!("Failed to send response to pending request");
+                                }
+                            }
+                        }
                     }
                     Message::Binary(bin) => {
-                        info!("Received binary from WebSocket: {:?}", bin);
-                        // Here you would handle responses from the client
+                        info!("Received binary from WebSocket: {:?}" , bin);
                     }
                     Message::Ping(ping) => {
                         info!("Received Ping from WebSocket. Sending Pong.");

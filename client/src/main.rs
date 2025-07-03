@@ -189,12 +189,11 @@ async fn main() {
                                 }
 
                                 let tunneled_req_id_for_spawn = tunneled_req.id.clone();
-                                let original_tunneled_req_id = tunneled_req.id;
 
                                 tokio::spawn(async move {
                                     let tunneled_http_response = match request_builder.send().await {
                                         Ok(resp) => {
-                                            info!("Received response from local service for ID {}. Status: {}", original_tunneled_req_id, resp.status());
+                                            info!("Received response from local service for ID {}. Status: {}", tunneled_req_id_for_spawn, resp.status());
                                             let status = resp.status().as_u16();
                                             let mut headers_map = std::collections::HashMap::new();
                                             for (key, value) in resp.headers() {
@@ -204,14 +203,14 @@ async fn main() {
                                             let body_bytes = match resp.bytes().await {
                                                 Ok(bytes) => bytes.to_vec(),
                                                 Err(e) => {
-                                                    error!("Failed to read response body from local service for ID {}: {:?}", original_tunneled_req_id, e);
+                                                    error!("Failed to read response body from local service for ID {}: {:?}", tunneled_req_id_for_spawn, e);
                                                     Vec::new()
                                                 }
                                             };
                                             let body_base64 = general_purpose::STANDARD.encode(body_bytes);
 
                                             TunneledHttpResponse {
-                                                id: original_tunneled_req_id,
+                                                id: tunneled_req_id_for_spawn,
                                                 status,
                                                 headers: headers_map,
                                                 body: Some(body_base64),
@@ -223,7 +222,7 @@ async fn main() {
                                                 id: tunneled_req_id_for_spawn,
                                                 status: 503,
                                                 headers: std::collections::HashMap::new(),
-                                                body: Some(general_purpose::STANDARD.encode(format!("Failed to connect to local service: {}", e))),
+                                                body: Some(general_purpose::STANDARD.encode(format!("Service Unavailable"))),
                                             }
                                         }
                                     };
