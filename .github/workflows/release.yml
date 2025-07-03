@@ -9,8 +9,26 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build and Release
+  create_release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  build_and_upload:
+    name: Build and Upload
+    needs: create_release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -41,18 +59,13 @@ jobs:
         working-directory: ./client
 
       - name: Rename binary
-        run: mv ./client/target/${{ matrix.target }}/release/yats-client ./client/target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            mv ./client/target/${{ matrix.target }}/release/yats-client.exe ./client/target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          else
+            mv ./client/target/${{ matrix.target }}/release/yats-client ./client/target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          fi
 
       - name: Upload Release Asset
         id: upload-release-asset
@@ -60,7 +73,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
           asset_path: ./client/target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
           asset_name: ${{ matrix.artifact_name }}
           asset_content_type: application/octet-stream
