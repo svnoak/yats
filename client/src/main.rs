@@ -75,26 +75,20 @@ async fn main() {
 
     println!("WebSocket connection established!");
 
-    // Split the WebSocket stream into sender and receiver parts
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
-    // Create an MPSC channel to send messages to the WebSocket sender task
-    let (tx, mut rx) = mpsc::channel::<WsMessage>(100); // Buffer size 100
+    let (tx, mut rx) = mpsc::channel::<WsMessage>(100);
 
-    // Spawn a task to continuously send messages from the MPSC channel to the WebSocket
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
             if let Err(e) = ws_sender.send(message).await {
                 error!("Failed to send message over WebSocket: {:?}", e);
-                // Depending on error, you might want to break or try to reconnect
                 break;
             }
         }
         info!("WebSocket sender task shutting down.");
     });
 
-
-    // Construct the public URL for the client's tunnel
     let client_public_url_base = config.server_ws_url
         .replace("ws://", "http://")
         .replace("wss://", "https://")
@@ -108,7 +102,6 @@ async fn main() {
 
     debug!("Server response during handshake: {:?}", response);
 
-    // Create a single reqwest client to reuse for all forwarded requests
     let http_client = Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -116,26 +109,22 @@ async fn main() {
 
     loop {
         tokio::select! {
-            // Read from the read half of the WS stream
             message = ws_receiver.next() => {
                 match message {
                     Some(Ok(WsMessage::Text(text))) => {
                         info!("Received text from server (potential TunneledRequest): {}", text);
-                        let tx_clone = tx.clone(); // Clone the mpsc sender for the spawned task
+                        let tx_clone = tx.clone();
                         match serde_json::from_str::<TunneledRequest>(&text) {
-                            Ok(mut tunneled_req) => { // Added `mut` here because we might need to move `id` multiple times
+                            Ok(mut tunneled_req) => {
                                 debug!("Deserialized TunneledRequest (ID: {}): {:?}", tunneled_req.id, tunneled_req);
 
-                                // Construct the URL for the local service
                                 let local_service_url = format!("{}{}", config.target_http_service_url, tunneled_req.path);
                                 info!("Forwarding request (ID: {}) to local service: {} {}", tunneled_req.id, tunneled_req.method, local_service_url);
 
-                                // Parse HTTP method
                                 let method = match ReqwestMethod::from_bytes(tunneled_req.method.as_bytes()) {
                                     Ok(m) => m,
                                     Err(_) => {
                                         error!("Invalid HTTP method received for ID {}: {}", tunneled_req.id, tunneled_req.method);
-                                        // Use .clone() here
                                         let err_resp = TunneledHttpResponse {
                                             id: tunneled_req.id.clone(), // Clone the ID
                                             status: 400,
@@ -149,17 +138,13 @@ async fn main() {
                                     }
                                 };
 
-                                // Build the request to the local service
                                 let mut request_builder = http_client.request(method, &local_service_url);
 
-                                // Add query params
                                 if !tunneled_req.query_params.is_empty() {
                                     request_builder = request_builder.query(&tunneled_req.query_params);
                                 }
 
-                                // Add headers
                                 for (key, value) in tunneled_req.headers {
-                                    // Filter out hop-by-hop headers that reqwest handles or are not relevant for forwarding
                                     if key.eq_ignore_ascii_case("host") ||
                                        key.eq_ignore_ascii_case("connection") ||
                                        key.eq_ignore_ascii_case("keep-alive") ||
