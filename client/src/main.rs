@@ -14,14 +14,14 @@ use tokio_tungstenite::{
 use url::Url;
 use tracing::{info, error, debug, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use futures_util::stream::{StreamExt, SplitSink, SplitStream};
-use futures_util::sink::SinkExt; // Needed for `send` method on `SplitSink`
+use futures_util::stream::{StreamExt};
+use futures_util::sink::SinkExt;
 use tungstenite::http::HeaderValue;
 use tungstenite::http::header::{AUTHORIZATION};
 use tungstenite::handshake::client::Request;
 use tokio_tungstenite::tungstenite::handshake::client::generate_key;
 use config::AppConfig;
-use reqwest::{Client, Method as ReqwestMethod, Response as ReqwestResponse};
+use reqwest::{Client, Method as ReqwestMethod};
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::time::Duration;
@@ -115,7 +115,7 @@ async fn main() {
                         info!("Received text from server (potential TunneledRequest): {}", text);
                         let tx_clone = tx.clone();
                         match serde_json::from_str::<TunneledRequest>(&text) {
-                            Ok(mut tunneled_req) => {
+                            Ok(tunneled_req) => {
                                 debug!("Deserialized TunneledRequest (ID: {}): {:?}", tunneled_req.id, tunneled_req);
 
                                 let local_service_url = format!("{}{}", config.target_http_service_url, tunneled_req.path);
