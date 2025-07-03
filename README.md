@@ -6,6 +6,12 @@ This project provides a simple yet powerful tunneling service that allows you to
 2.  **Client**: A Rust-based WebSocket client that connects to the server, receives forwarded HTTP requests, and sends them to a local web service.
 3.  **Local App**: A sample Python-based web service that listens on port 8080 and prints the details of incoming requests.
 
+## What makes this tunnel different?
+You might be able to find what you seek in other places. I do not claim to have the best tunnel service.
+This tunnel aims to forward all endpoint requests in unaltered form to the local service, and return with the services unaltered response.
+
+You can also run multiple websockets, differntiated by client ids.
+
 ## Prerequisites
 
 Before you can run this project, you need to have the following installed:
