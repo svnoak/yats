@@ -42,6 +42,15 @@ cargo run
 
 ### 2. Run the Client
 
+You can download a binary for your system to run the client without installing Rust.
+For MacOs you'll have to run the following commands:
+For Linux you'll simply run the chmod and for Windows you're on your own.
+```bash
+➜  xattr -d com.apple.quarantine yats-client-macos-amd64
+➜  chmod +x yats-client-macos-amd64                     
+➜  ./yats-client-macos-amd64                    
+```
+
 The client is a Rust-based WebSocket client that connects to the server and forwards HTTP requests to the local app. Before you can run it, you need to create a `.env` file in the `client` directory with the following content:
 
 ```
