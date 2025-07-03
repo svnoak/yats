@@ -10,7 +10,7 @@ This project provides a simple yet powerful tunneling service that allows you to
 You might be able to find what you seek in other places. I do not claim to have the best tunnel service.
 This tunnel aims to forward all endpoint requests in unaltered form to the local service, and return with the services unaltered response.
 
-You can also run multiple websockets, differntiated by client ids.
+You can also run multiple websockets, differentiated by client ids.
 
 ## Prerequisites
 
