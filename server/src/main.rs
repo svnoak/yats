@@ -41,6 +41,7 @@ struct TunneledRequest {
     method: String,
     path: String,
     headers: HashMap<String, String>,
+    query_params: HashMap<String, String>,
     body: String, // base64 encoded
 }
 
@@ -84,12 +85,14 @@ async fn handle_forwarding_request(
     headers: HeaderMap,
     body: bytes::Bytes,
     forward_path: String,
+    query_params: HashMap<String, String>,
 ) -> impl IntoResponse {
     info!(
-        "Forwarding request for client_id: {}, path: {}, method: {}",
+        "Forwarding request for client_id: {}, path: {}, method: {}, query_params: {:?}",
         client_id,
         forward_path,
-        method.as_str()
+        method.as_str(),
+        query_params
     );
 
     if let Some(ws_sender) = app_state.active_websockets.get(&client_id) {
@@ -103,6 +106,7 @@ async fn handle_forwarding_request(
             method: method.to_string(),
             path: forward_path,
             headers: headers_map,
+            query_params,
             body: general_purpose::STANDARD.encode(body),
         };
 
@@ -136,24 +140,26 @@ async fn handle_forwarding_request(
 async fn forward_handler_no_path(
     State(app_state): State<Arc<AppState>>,
     Path(client_id): Path<String>,
+    Query(query_params): Query<HashMap<String, String>>,
     method: Method,
     headers: HeaderMap,
     body: bytes::Bytes,
 ) -> impl IntoResponse {
     let forward_path = "/".to_string();
-    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path).await
+    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path, query_params).await
 }
 
 #[axum::debug_handler]
 async fn forward_handler_with_path( // Renamed for clarity
     State(app_state): State<Arc<AppState>>,
     Path((client_id, path)): Path<(String, String)>,
+    Query(query_params): Query<HashMap<String, String>>,
     method: Method,
     headers: HeaderMap,
     body: bytes::Bytes,
 ) -> impl IntoResponse {
     let forward_path = format!("/{}", path);
-    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path).await
+    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path, query_params).await
 }
 
 

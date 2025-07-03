@@ -152,6 +152,11 @@ async fn main() {
                                 // Build the request to the local service
                                 let mut request_builder = http_client.request(method, &local_service_url);
 
+                                // Add query params
+                                if !tunneled_req.query_params.is_empty() {
+                                    request_builder = request_builder.query(&tunneled_req.query_params);
+                                }
+
                                 // Add headers
                                 for (key, value) in tunneled_req.headers {
                                     // Filter out hop-by-hop headers that reqwest handles or are not relevant for forwarding
