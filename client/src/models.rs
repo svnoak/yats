@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TunneledHttpRequest {
-    pub request_id: String,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TunneledRequest {
+    pub id: String,
     pub method: String,
     pub path: String,
     pub headers: HashMap<String, String>,
@@ -12,7 +12,7 @@ pub struct TunneledHttpRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TunneledHttpResponse {
-    pub request_id: String,
+    pub id: String,
     pub status: u16,
     pub headers: HashMap<String, String>,
     pub body: Option<String>,

@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use rand::seq::SliceRandom;
+use rand::thread_rng; // Added this import
 
 const WORDS: &[&str] = &[
     "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet",
@@ -14,7 +15,7 @@ const WORDS: &[&str] = &[
 ];
 
 pub fn generate_random_id_phrase() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
 
     let word1 = WORDS.choose(&mut rng).unwrap();
     let word2 = WORDS.choose(&mut rng).unwrap();
