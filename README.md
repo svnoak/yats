@@ -11,21 +11,13 @@ This project provides a simple yet powerful tunneling service that allows you to
 Before you can run this project, you need to have the following installed:
 
 *   [Rust](https://www.rust-lang.org/tools/install)
-*   [Python 3](https://www.python.org/downloads/)
+*   [Python 3](https://www.python.org/downloads/) (for local test app)
 
 ## How to Run
 
 To get the tunneling service up and running, you need to start all three components in the following order:
 
-### 1. Run the Local App
-
-The local app is a simple Python web service that listens on port 8080. To start it, run the following command in the `localapp` directory:
-
-```bash
-python3 app.py
-```
-
-### 2. Run the Server
+### 1. Run the Server
 
 The server is a Rust-based WebSocket server that listens on port 3000. Before you can run it, you need to create a `.env` file in the `server` directory with the following content:
 
@@ -42,7 +34,7 @@ cargo build
 cargo run
 ```
 
-### 3. Run the Client
+### 2. Run the Client
 
 The client is a Rust-based WebSocket client that connects to the server and forwards HTTP requests to the local app. Before you can run it, you need to create a `.env` file in the `client` directory with the following content:
 
@@ -60,6 +52,15 @@ Once you have created the `.env` file, you can build and run the client with the
 ```bash
 cargo build
 cargo run
+```
+
+
+### 3. Run the Local App for testing
+
+The local app is a simple Python web service that listens on port 8080. To start it, run the following command in the `localapp` directory:
+
+```bash
+python3 app.py
 ```
 
 ## Testing the Setup
