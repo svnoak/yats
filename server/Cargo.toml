@@ -4,17 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+base64.workspace = true
+dotenvy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+
 axum = { version = "0.7.5", features = ["ws", "macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
-tokio = { version = "1.37.0", features = ["full"] }
-tower-http = { version = "0.5", features = ["trace"] }
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-serde_json = "1.0.116"
-serde = { version = "1.0.198", features = ["derive"] }
-dotenvy = "0.15.7"
+bytes = "1.6.0"
 dashmap = "5.5.3"
 futures-util = "0.3.30"
-base64 = "0.22.1"
+tower-http = { version = "0.5", features = ["trace"] }
 uuid = { version = "1.8.0", features = ["v4"] }
-bytes = "1.6.0"
