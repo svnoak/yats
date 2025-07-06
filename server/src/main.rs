@@ -266,6 +266,11 @@ async fn handle_single_websocket(
     client_id: String,
 ) {
     info!("WebSocket connected for client_id: {}", client_id);
+    if app_state.active_websockets.contains_key(&client_id) {
+        error!("Client ID '{}' already exists. Rejecting connection.", client_id);
+        let _ = socket.close().await;
+        return;
+    }
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Message>(100);
     app_state.active_websockets.insert(client_id.clone(), tx);
 
