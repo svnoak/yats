@@ -1,35 +1,30 @@
 // src/main.rs
 
-mod models;
 mod config;
+mod models;
 mod utils;
 
-use crate::models::{TunneledRequest, TunneledHttpResponse};
+use crate::models::{TunneledHttpResponse, TunneledRequest};
 
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::protocol::Message as WsMessage,
-    tungstenite,
-};
-use url::Url;
-use tracing::{info, error, debug, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use futures_util::stream::{StreamExt};
-use futures_util::sink::SinkExt;
-use tungstenite::http::HeaderValue;
-use tungstenite::http::header::{AUTHORIZATION};
-use tungstenite::handshake::client::Request;
-use tokio_tungstenite::tungstenite::handshake::client::generate_key;
-use config::AppConfig;
-use reqwest::{Client, Method as ReqwestMethod};
 use base64::engine::general_purpose;
 use base64::Engine;
+use config::AppConfig;
+use futures_util::sink::SinkExt;
+use futures_util::stream::StreamExt;
+use reqwest::{Client, Method as ReqwestMethod};
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::handshake::client::generate_key;
+use tokio_tungstenite::{connect_async, tungstenite, tungstenite::protocol::Message as WsMessage};
+use tracing::{debug, error, info, warn};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tungstenite::handshake::client::Request;
+use tungstenite::http::header::AUTHORIZATION;
+use tungstenite::http::HeaderValue;
+use url::Url;
 
 #[tokio::main]
 async fn main() {
-
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -42,12 +37,17 @@ async fn main() {
 
     let config = AppConfig::new();
 
-    let ws_url = Url::parse(&format!("{}?client_id={}", config.server_ws_url, config.client_id))
-        .expect("Failed to parse WebSocket URL. Please ensure it's a valid URL.");
+    let ws_url = Url::parse(&format!(
+        "{}?client_id={}",
+        config.server_ws_url, config.client_id
+    ))
+    .expect("Failed to parse WebSocket URL. Please ensure it's a valid URL.");
 
     let auth_header_value = format!("Bearer {}", config.secret_token);
 
-    let host = ws_url.host_str().expect("Invalid host in WebSocket URL. Please ensure the URL has a host.");
+    let host = ws_url
+        .host_str()
+        .expect("Invalid host in WebSocket URL. Please ensure the URL has a host.");
 
     let request = Request::builder()
         .method("GET")
@@ -57,10 +57,14 @@ async fn main() {
         .header("Connection", "upgrade")
         .header("Sec-Websocket-Key", generate_key())
         .header("Sec-Websocket-Version", "13")
-        .header(AUTHORIZATION, HeaderValue::from_str(&auth_header_value).expect("Invalid Authorization header value. This should not happen with valid input."))
+        .header(
+            AUTHORIZATION,
+            HeaderValue::from_str(&auth_header_value).expect(
+                "Invalid Authorization header value. This should not happen with valid input.",
+            ),
+        )
         .body(())
         .unwrap();
-
 
     println!("Attempting to connect to WebSocket server at {}", ws_url);
 
@@ -79,6 +83,15 @@ async fn main() {
 
     let (tx, mut rx) = mpsc::channel::<WsMessage>(100);
 
+    // Spawn a task to handle Ctrl-C and send a Close frame
+    let tx_ctrlc = tx.clone();
+    tokio::spawn(async move {
+        if tokio::signal::ctrl_c().await.is_ok() {
+            info!("Ctrl-C received, sending Close frame to server...");
+            let _ = tx_ctrlc.send(WsMessage::Close(None)).await;
+        }
+    });
+
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
             if let Err(e) = ws_sender.send(message).await {
@@ -88,8 +101,8 @@ async fn main() {
         }
         info!("WebSocket sender task shutting down.");
     });
-
-    let client_public_url_base = config.server_ws_url
+    let client_public_url_base = config
+        .server_ws_url
         .replace("ws://", "http://")
         .replace("wss://", "https://")
         .trim_end_matches("/ws")
@@ -97,8 +110,14 @@ async fn main() {
 
     println!("\nYour tunnel is active! Requests to:");
     println!("  {}/{}", client_public_url_base, config.client_id);
-    println!("  {}/{}/any/path/you/want", client_public_url_base, config.client_id);
-    println!("Will be forwarded to your local service at: {}", config.target_http_service_url);
+    println!(
+        "  {}/{}/any/path/you/want",
+        client_public_url_base, config.client_id
+    );
+    println!(
+        "Will be forwarded to your local service at: {}",
+        config.target_http_service_url
+    );
 
     debug!("Server response during handshake: {:?}", response);
 

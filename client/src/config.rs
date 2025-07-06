@@ -1,6 +1,6 @@
-use std::env;
-use dotenvy::dotenv;
 use crate::utils::{generate_random_id_phrase, get_input_with_default};
+use dotenvy::dotenv;
+use std::env;
 use url::Url;
 
 pub struct AppConfig {
@@ -12,7 +12,6 @@ pub struct AppConfig {
 
 impl AppConfig {
     pub fn new() -> Self {
-
         dotenv().ok();
 
         let server_ws_url_default =
@@ -29,7 +28,7 @@ impl AppConfig {
 
         let target_http_service_url_default = env::var("TARGET_HTTP_SERVICE_URL")
             .unwrap_or_else(|_| "http://localhost:8080".to_string());
-        
+
         let target_http_service_url = loop {
             let url_input = get_input_with_default(
                 "Enter Target HTTP Service URL",
@@ -44,11 +43,15 @@ impl AppConfig {
                     }
                     if let Some(host) = parsed_url.host_str() {
                         if host != "localhost" && host != "127.0.0.1" {
-                            eprintln!("Error: The local service must run on 'localhost' or '127.0.0.1'.");
+                            eprintln!(
+                                "Error: The local service must run on 'localhost' or '127.0.0.1'."
+                            );
                             std::process::exit(1);
                         }
                     } else {
-                        eprintln!("Error: Could not determine the host from the Target HTTP Service URL.");
+                        eprintln!(
+                            "Error: Could not determine the host from the Target HTTP Service URL."
+                        );
                         std::process::exit(1);
                     }
                     break url_input;
