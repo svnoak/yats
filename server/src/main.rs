@@ -1,29 +1,28 @@
+use axum::extract::State;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Path,
-        Query,
+        Path, Query,
     },
     http::{HeaderMap, Method, StatusCode},
-    response::{IntoResponse},
+    response::IntoResponse,
     routing::{any, get},
     Router,
 };
-use tokio::net::TcpListener;
-use serde::Deserialize;
 use axum_extra::{headers::Authorization, TypedHeader};
-use tracing::{info, error};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use axum::extract::State;
-use std::sync::Arc;
-use dotenvy::dotenv;
-use std::env;
 use base64::engine::general_purpose;
 use base64::Engine;
 use dashmap::DashMap;
+use dotenvy::dotenv;
+use serde::Deserialize;
 use std::collections::HashMap;
-use uuid::Uuid;
+use std::env;
+use std::sync::Arc;
+use tokio::net::TcpListener;
 use tokio::sync::oneshot;
+use tracing::{error, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 struct ClientParams {
@@ -58,8 +57,8 @@ struct TunneledHttpResponse {
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let secret_token = env::var("SECRET_TOKEN")
-        .expect("SECRET_TOKEN must be set in .env file or environment");
+    let secret_token =
+        env::var("SECRET_TOKEN").expect("SECRET_TOKEN must be set in .env file or environment");
 
     let app_state = Arc::new(AppState {
         secret_token,
@@ -69,8 +68,9 @@ async fn main() {
 
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "rust_tunnel_server=debug,tower_http=debug,reqwest=debug".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "rust_tunnel_server=debug,tower_http=debug,reqwest=debug".into()
+            }),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -87,7 +87,6 @@ async fn main() {
     info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
-
 
 async fn handle_forwarding_request(
     app_state: Arc<AppState>,
@@ -139,15 +138,27 @@ async fn handle_forwarding_request(
 
                 match tokio::time::timeout(tokio::time::Duration::from_secs(30), rx).await {
                     Ok(Ok(response)) => {
-                        let mut builder = axum::response::Response::builder()
-                            .status(StatusCode::from_u16(response.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR));
-                        
+                        let mut builder = axum::response::Response::builder().status(
+                            StatusCode::from_u16(response.status)
+                                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                        );
+
                         for (key, value) in response.headers {
                             builder = builder.header(key, value);
                         }
 
-                        let body = response.body.and_then(|b| general_purpose::STANDARD.decode(b).ok());
-                        builder.body(axum::body::Body::from(body.unwrap_or_default())).unwrap_or_else(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to build response").into_response())
+                        let body = response
+                            .body
+                            .and_then(|b| general_purpose::STANDARD.decode(b).ok());
+                        builder
+                            .body(axum::body::Body::from(body.unwrap_or_default()))
+                            .unwrap_or_else(|_| {
+                                (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    "Failed to build response",
+                                )
+                                    .into_response()
+                            })
                     }
                     Ok(Err(_)) | Err(_) => {
                         app_state.pending_responses.remove(&request_id);
@@ -180,11 +191,21 @@ async fn forward_handler_no_path(
     body: bytes::Bytes,
 ) -> impl IntoResponse {
     let forward_path = "/".to_string();
-    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path, query_params).await
+    handle_forwarding_request(
+        app_state,
+        client_id,
+        method,
+        headers,
+        body,
+        forward_path,
+        query_params,
+    )
+    .await
 }
 
 #[axum::debug_handler]
-async fn forward_handler_with_path( // Renamed for clarity
+async fn forward_handler_with_path(
+    // Renamed for clarity
     State(app_state): State<Arc<AppState>>,
     Path((client_id, path)): Path<(String, String)>,
     Query(query_params): Query<HashMap<String, String>>,
@@ -193,9 +214,17 @@ async fn forward_handler_with_path( // Renamed for clarity
     body: bytes::Bytes,
 ) -> impl IntoResponse {
     let forward_path = format!("/{}", path);
-    handle_forwarding_request(app_state, client_id, method, headers, body, forward_path, query_params).await
+    handle_forwarding_request(
+        app_state,
+        client_id,
+        method,
+        headers,
+        body,
+        forward_path,
+        query_params,
+    )
+    .await
 }
-
 
 #[axum::debug_handler]
 async fn ws_handler(
@@ -210,7 +239,11 @@ async fn ws_handler(
             auth_header
         } else {
             error!("Missing Authorization header");
-            return (axum::http::StatusCode::UNAUTHORIZED, "Missing Authorization header").into_response();
+            return (
+                axum::http::StatusCode::UNAUTHORIZED,
+                "Missing Authorization header",
+            )
+                .into_response();
         };
 
     if auth_header.token() != app_state.secret_token {
@@ -224,9 +257,7 @@ async fn ws_handler(
     );
 
     let client_id = params.client_id.clone();
-    ws.on_upgrade(move |socket| {
-        handle_single_websocket(socket, app_state, client_id)
-    })
+    ws.on_upgrade(move |socket| handle_single_websocket(socket, app_state, client_id))
 }
 
 async fn handle_single_websocket(

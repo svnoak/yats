@@ -1,17 +1,17 @@
-use std::io::{self, Write};
 use rand::seq::SliceRandom;
-use rand::thread_rng; // Added this import
+use rand::thread_rng;
+use std::io::{self, Write}; // Added this import
 
 const WORDS: &[&str] = &[
     "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet",
     "kilo", "lima", "mike", "november", "oscar", "papa", "quebec", "romeo", "sierra", "tango",
-    "uniform", "victor", "whiskey", "xray", "yankee", "zulu",
-    "apple", "banana", "cherry", "grape", "lemon", "mango", "orange", "peach", "pear", "plum",
-    "forest", "river", "mountain", "ocean", "desert", "island", "valley", "stream", "lake", "glacier",
-    "cloud", "star", "moon", "sun", "earth", "sky", "wind", "rain", "snow", "thunder",
-    "bright", "dark", "fast", "slow", "happy", "sad", "big", "small", "green", "blue",
-    "red", "yellow", "white", "black", "silver", "golden", "crystal", "iron", "stone", "wooden",
-    "fire", "water", "air", "land", "rock", "sand", "soil", "metal", "plant", "leaf",
+    "uniform", "victor", "whiskey", "xray", "yankee", "zulu", "apple", "banana", "cherry", "grape",
+    "lemon", "mango", "orange", "peach", "pear", "plum", "forest", "river", "mountain", "ocean",
+    "desert", "island", "valley", "stream", "lake", "glacier", "cloud", "star", "moon", "sun",
+    "earth", "sky", "wind", "rain", "snow", "thunder", "bright", "dark", "fast", "slow", "happy",
+    "sad", "big", "small", "green", "blue", "red", "yellow", "white", "black", "silver", "golden",
+    "crystal", "iron", "stone", "wooden", "fire", "water", "air", "land", "rock", "sand", "soil",
+    "metal", "plant", "leaf",
 ];
 
 pub fn generate_random_id_phrase() -> String {
@@ -29,7 +29,9 @@ pub fn get_input_with_default(prompt: &str, default_value: &str) -> String {
     io::stdout().flush().expect("Failed to flush stdout"); // Ensure prompt is displayed immediately
 
     let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed to read input line");
+    io::stdin()
+        .read_line(&mut input)
+        .expect("Failed to read input line");
 
     let trimmed_input = input.trim();
     if trimmed_input.is_empty() {
