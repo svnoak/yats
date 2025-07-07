@@ -251,6 +251,11 @@ async fn ws_handler(
         return (StatusCode::FORBIDDEN, "Invalid token").into_response();
     }
 
+    if app_state.active_websockets.contains_key(&params.client_id) {
+        error!("Client ID '{}' already exists. Rejecting connection.", params.client_id);
+        return (StatusCode::BAD_REQUEST, "Client ID already exists").into_response();
+    }
+
     info!(
         "WebSocket connection authorized for client_id: {}",
         params.client_id
