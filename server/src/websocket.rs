@@ -29,6 +29,11 @@ pub async fn ws_handler(
     }
 
     let client_id = params.client_id.clone();
+    let allowed_paths = params.allowed_paths.clone();
+    if let Err(e) = access_control::add_allowed_paths(&app_state, &client_id, allowed_paths) {
+        error!("Failed to add allowed paths");
+        return e.into_response();
+    }
     ws.on_upgrade(move |socket| handle_websocket(socket, app_state, client_id))
 }
 

@@ -4,6 +4,16 @@ use std::collections::HashMap;
 #[derive(Debug, Deserialize)]
 pub struct ClientParams {
     pub client_id: String,
+    #[serde(deserialize_with = "deserialize_comma_separated")]
+    pub allowed_paths: Vec<String>,
+}
+
+fn deserialize_comma_separated<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(s.split(',').map(|s| s.to_string()).collect())
 }
 
 #[derive(Serialize, Deserialize, Debug)]

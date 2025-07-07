@@ -31,3 +31,47 @@ pub fn authenticate_client(
 
     Ok(())
 }
+
+pub fn add_allowed_paths(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    paths: Vec<String>,
+) -> Result<(), impl IntoResponse> {
+    if paths.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "No paths provided").into_response());
+    }
+
+    app_state.allowed_paths.insert(client_id.to_string(), paths);
+    Ok(())
+}
+
+pub fn is_path_allowed(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    requested_path: &str,
+) -> Result<(), impl IntoResponse> {
+    if let Some(allowed_paths_ref) = app_state.allowed_paths.get(client_id) {
+        if allowed_paths_ref.is_empty() {
+            error!("No allowed paths configured for client_id '{}'.", client_id);
+            return Err((StatusCode::NOT_FOUND).into_response());
+        }
+
+        let is_allowed = allowed_paths_ref.iter().any(|p| p == requested_path);
+
+        if is_allowed {
+            Ok(())
+        } else {
+            error!(
+                "Path '{}' is not in the allowed list for client_id '{}'",
+                requested_path, client_id
+            );
+            Err((StatusCode::NOT_FOUND).into_response())
+        }
+    } else {
+        error!(
+            "No path configuration found for client_id '{}'. It may be disconnected.",
+            client_id
+        );
+        Err((StatusCode::NOT_FOUND).into_response())
+    }
+}

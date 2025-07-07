@@ -26,7 +26,7 @@ pub fn generate_random_id_phrase() -> String {
 
 pub fn get_input_with_default(prompt: &str, default_value: &str) -> String {
     print!("{} [default: {}]: ", prompt, default_value);
-    io::stdout().flush().expect("Failed to flush stdout"); // Ensure prompt is displayed immediately
+    io::stdout().flush().expect("Failed to flush stdout");
 
     let mut input = String::new();
     io::stdin()

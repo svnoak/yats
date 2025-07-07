@@ -1,5 +1,3 @@
-// src/main.rs
-
 mod config;
 mod models;
 mod utils;
@@ -37,9 +35,11 @@ async fn main() {
 
     let config = AppConfig::new();
 
+    let allowed_paths_query = config.allowed_paths.join(",");
+
     let ws_url = Url::parse(&format!(
-        "{}?client_id={}",
-        config.server_ws_url, config.client_id
+        "{}?client_id={}&allowed_paths={}",
+        config.server_ws_url, config.client_id, allowed_paths_query
     ))
     .expect("Failed to parse WebSocket URL. Please ensure it's a valid URL.");
 
