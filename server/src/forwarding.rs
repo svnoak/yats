@@ -1,10 +1,10 @@
 use crate::models::TunneledRequest;
-use crate::AppState;
+use crate::{access_control, AppState};
 use axum::extract::ws::Message;
 use axum::extract::State;
 use axum::extract::{Path, Query};
 use axum::http::{HeaderMap, Method, StatusCode};
-use axum::response::IntoResponse;
+use axum::response::{IntoResponse, Response};
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use tokio::sync::oneshot;
 use tracing::{error, info};
 use uuid::Uuid;
 
-pub async fn handle_forwarding_request(
+async fn handle_forwarding_request(
     app_state: Arc<AppState>,
     client_id: String,
     method: Method,
@@ -21,7 +21,7 @@ pub async fn handle_forwarding_request(
     body: bytes::Bytes,
     forward_path: String,
     query_params: HashMap<String, String>,
-) -> impl IntoResponse {
+) -> Response {
     info!(
         "Forwarding request for client_id: {}, path: {}, method: {}, query_params: {:?}",
         client_id,
@@ -29,6 +29,10 @@ pub async fn handle_forwarding_request(
         method.as_str(),
         query_params
     );
+
+    if let Err(response) = access_control::is_path_allowed(&app_state, &client_id, &forward_path) {
+        return response.into_response();
+    }
 
     if let Some(ws_sender) = app_state.active_websockets.get(&client_id) {
         let headers_map: HashMap<String, String> = headers
@@ -114,7 +118,7 @@ pub async fn forward_handler_no_path(
     method: Method,
     headers: HeaderMap,
     body: bytes::Bytes,
-) -> impl IntoResponse {
+) -> Response {
     let forward_path = "/".to_string();
     handle_forwarding_request(
         app_state,
@@ -136,7 +140,7 @@ pub async fn forward_handler_with_path(
     method: Method,
     headers: HeaderMap,
     body: bytes::Bytes,
-) -> impl IntoResponse {
+) -> Response {
     let forward_path = format!("/{}", path);
     handle_forwarding_request(
         app_state,

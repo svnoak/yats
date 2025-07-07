@@ -24,6 +24,7 @@ pub struct AppState {
     pub secret_token: String,
     pub active_websockets: Arc<DashMap<String, tokio::sync::mpsc::Sender<Message>>>,
     pub pending_responses: Arc<DashMap<String, oneshot::Sender<TunneledHttpResponse>>>,
+    pub allowed_paths: Arc<DashMap<String, Vec<String>>>,
 }
 
 impl AppState {
@@ -33,6 +34,7 @@ impl AppState {
             secret_token: config.secret_token,
             active_websockets: Arc::new(DashMap::new()),
             pending_responses: Arc::new(DashMap::new()),
+            allowed_paths: Arc::new(DashMap::new()),
         }
     }
 }
