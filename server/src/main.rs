@@ -251,6 +251,11 @@ async fn ws_handler(
         return (StatusCode::FORBIDDEN, "Invalid token").into_response();
     }
 
+    if app_state.active_websockets.contains_key(&params.client_id) {
+        error!("Client ID '{}' already exists. Rejecting connection.", params.client_id);
+        return (StatusCode::BAD_REQUEST, "Client ID already exists").into_response();
+    }
+
     info!(
         "WebSocket connection authorized for client_id: {}",
         params.client_id
@@ -266,11 +271,6 @@ async fn handle_single_websocket(
     client_id: String,
 ) {
     info!("WebSocket connected for client_id: {}", client_id);
-    if app_state.active_websockets.contains_key(&client_id) {
-        error!("Client ID '{}' already exists. Rejecting connection.", client_id);
-        let _ = socket.close().await;
-        return;
-    }
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Message>(100);
     app_state.active_websockets.insert(client_id.clone(), tx);
 
