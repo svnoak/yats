@@ -50,9 +50,6 @@ async fn main() {
     let app = Router::new()
         .route("/ws", get(websocket::ws_handler))
         .route("/*path", any(forwarding::forward_handler))
-        //.route("/:client_id", any(forwarding::forward_handler_no_path))
-        //.route("/*path", any(forwarding::forward_handler_no_path))
-        //.route("/:client_id/*path",any(forwarding::forward_handler_with_path),
         .with_state(app_state);
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();

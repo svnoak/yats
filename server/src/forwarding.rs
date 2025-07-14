@@ -111,50 +111,6 @@ async fn handle_forwarding_request(
 }
 
 #[axum::debug_handler]
-pub async fn forward_handler_no_path(
-    State(app_state): State<Arc<AppState>>,
-    Path(client_id): Path<String>,
-    Query(query_params): Query<HashMap<String, String>>,
-    method: Method,
-    headers: HeaderMap,
-    body: bytes::Bytes,
-) -> Response {
-    let forward_path = "/".to_string();
-    handle_forwarding_request(
-        app_state,
-        client_id,
-        method,
-        headers,
-        body,
-        forward_path,
-        query_params,
-    )
-    .await
-}
-
-#[axum::debug_handler]
-pub async fn forward_handler_with_path(
-    State(app_state): State<Arc<AppState>>,
-    Path((client_id, path)): Path<(String, String)>,
-    Query(query_params): Query<HashMap<String, String>>,
-    method: Method,
-    headers: HeaderMap,
-    body: bytes::Bytes,
-) -> Response {
-    let forward_path = format!("/{}", path);
-    handle_forwarding_request(
-        app_state,
-        client_id,
-        method,
-        headers,
-        body,
-        forward_path,
-        query_params,
-    )
-    .await
-}
-
-#[axum::debug_handler]
 pub async fn forward_handler(
     State(app_state): State<Arc<AppState>>,
     Path(path): Path<String>,
