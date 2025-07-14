@@ -1,8 +1,8 @@
 use crate::models::{TunneledHttpResponse, TunneledRequest};
 use base64::{engine::general_purpose, Engine};
 use reqwest::{Client, Method as ReqwestMethod};
-use tungstenite::http::HeaderValue;
 use tracing::{error, info, warn};
+use tungstenite::http::HeaderValue;
 
 pub async fn forward_request_to_local_service(
     http_client: &Client,
@@ -75,7 +75,9 @@ pub async fn forward_request_to_local_service(
                         id: tunneled_req.id,
                         status: 400,
                         headers: std::collections::HashMap::new(),
-                        body: Some(general_purpose::STANDARD.encode("Failed to decode request body")),
+                        body: Some(
+                            general_purpose::STANDARD.encode("Failed to decode request body"),
+                        ),
                     };
                 }
             }
@@ -92,8 +94,10 @@ pub async fn forward_request_to_local_service(
             let status = resp.status().as_u16();
             let mut headers_map = std::collections::HashMap::new();
             for (key, value) in resp.headers() {
-                headers_map
-                    .insert(key.to_string(), value.to_str().unwrap_or_default().to_string());
+                headers_map.insert(
+                    key.to_string(),
+                    value.to_str().unwrap_or_default().to_string(),
+                );
             }
 
             let body_bytes = match resp.bytes().await {

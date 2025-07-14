@@ -111,37 +111,26 @@ async fn handle_forwarding_request(
 }
 
 #[axum::debug_handler]
-pub async fn forward_handler_no_path(
+pub async fn forward_handler(
     State(app_state): State<Arc<AppState>>,
-    Path(client_id): Path<String>,
+    Path(path): Path<String>,
     Query(query_params): Query<HashMap<String, String>>,
     method: Method,
     headers: HeaderMap,
     body: bytes::Bytes,
 ) -> Response {
-    let forward_path = "/".to_string();
-    handle_forwarding_request(
-        app_state,
-        client_id,
-        method,
-        headers,
-        body,
-        forward_path,
-        query_params,
-    )
-    .await
-}
+    let mut segments = path.splitn(2, '/');
+    let client_id = segments.next().unwrap_or_default().to_string();
 
-#[axum::debug_handler]
-pub async fn forward_handler_with_path(
-    State(app_state): State<Arc<AppState>>,
-    Path((client_id, path)): Path<(String, String)>,
-    Query(query_params): Query<HashMap<String, String>>,
-    method: Method,
-    headers: HeaderMap,
-    body: bytes::Bytes,
-) -> Response {
-    let forward_path = format!("/{}", path);
+    if client_id.is_empty() {
+        return (StatusCode::BAD_REQUEST, "Missing client_id in path").into_response();
+    }
+
+    let forward_path = match segments.next() {
+        Some(p) => format!("/{}", p),
+        None => "".to_string(),
+    };
+
     handle_forwarding_request(
         app_state,
         client_id,
