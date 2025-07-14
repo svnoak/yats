@@ -6,6 +6,24 @@ pub struct ClientParams {
     pub client_id: String,
     #[serde(deserialize_with = "deserialize_comma_separated")]
     pub allowed_paths: Vec<String>,
+    #[serde(
+        deserialize_with = "deserialize_comma_separated_optional",
+        default = "default_vec"
+    )]
+    pub allowed_ips: Vec<String>,
+}
+
+fn default_vec() -> Vec<String> {
+    Vec::new()
+}
+
+fn deserialize_comma_separated_optional<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    Ok(s.map(|s| s.split(',').map(|s| s.to_string()).collect())
+        .unwrap_or_default())
 }
 
 fn deserialize_comma_separated<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>

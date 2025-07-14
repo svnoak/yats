@@ -1,6 +1,11 @@
 use crate::{models::ClientParams, AppState};
-use axum::{http::StatusCode, response::IntoResponse};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use axum_extra::{headers::Authorization, TypedHeader};
+use ipnetwork::IpNetwork;
+use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::error;
 
@@ -32,6 +37,15 @@ pub fn authenticate_client(
     Ok(())
 }
 
+pub fn add_allowed_ips(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    ips: Vec<String>,
+) -> Result<(), Response> {
+    app_state.allowed_ips.insert(client_id.to_string(), ips);
+    Ok(())
+}
+
 pub fn add_allowed_paths(
     app_state: &Arc<AppState>,
     client_id: &str,
@@ -43,6 +57,35 @@ pub fn add_allowed_paths(
 
     app_state.allowed_paths.insert(client_id.to_string(), paths);
     Ok(())
+}
+
+pub fn is_ip_allowed(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    remote_ip: IpAddr,
+) -> Result<(), Response> {
+    if let Some(allowed_ips_ref) = app_state.allowed_ips.get(client_id) {
+
+        if allowed_ips_ref.is_empty() {
+            return Ok(());
+        }
+
+        let is_allowed = allowed_ips_ref.iter().any(|ip_str| {
+            if let Ok(network) = ip_str.parse::<IpNetwork>() {
+                network.contains(remote_ip)
+            } else {
+                false
+            }
+        });
+
+        if is_allowed {
+            Ok(())
+        } else {
+            Err((StatusCode::FORBIDDEN, "IP not allowed").into_response())
+        }
+    } else {
+        Ok(())
+    }
 }
 
 pub fn is_path_allowed(

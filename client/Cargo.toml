@@ -11,6 +11,7 @@ serde_json.workspace = true
 tokio.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
+ipnetwork.workspace = true
 
 futures-util = { version = "0.3", features = ["sink"] }
 rand = "0.8"
@@ -24,4 +25,3 @@ reqwest = { version = "0.12", features = [
 tokio-tungstenite = "0.23"
 tungstenite = "0.23"
 url = "2.5"
-

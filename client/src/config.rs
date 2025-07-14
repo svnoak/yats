@@ -1,5 +1,6 @@
 use crate::utils::{generate_random_id_phrase, get_input_with_default};
 use dotenvy::dotenv;
+use ipnetwork::IpNetwork;
 use std::{env, io};
 use url::Url;
 
@@ -9,6 +10,7 @@ pub struct AppConfig {
     pub secret_token: String,
     pub target_http_service_url: String,
     pub allowed_paths: Vec<String>,
+    pub allowed_ips: Vec<String>,
 }
 
 impl AppConfig {
@@ -31,14 +33,77 @@ impl AppConfig {
 
         let allowed_paths = get_allowed_paths();
 
+        let allowed_ips = get_allowed_ips();
+
         Self {
             server_ws_url,
             client_id,
             secret_token,
             target_http_service_url,
             allowed_paths,
+            allowed_ips,
         }
     }
+}
+
+fn get_allowed_ips() -> Vec<String> {
+    println!(
+        "\n▶ Enter allowed IPs or CIDR ranges for the tunnel (e.g., 192.168.1.1, 10.0.0.0/8)."
+    );
+    println!("  - Press Enter on an empty line to finish. If no IPs are provided, all IPs will be allowed.");
+
+    let mut ips = Vec::new();
+    loop {
+        print!("> ");
+        io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
+
+        let mut ip_input = String::new();
+        match io::stdin().read_line(&mut ip_input) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                let ip_input = ip_input.trim().to_string();
+                if ip_input.is_empty() {
+                    if ips.is_empty() {
+                        print!("  ⚠️ Are you sure you want to allow all IPs? This is a security risk. (y/N) ");
+                        io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
+                        let mut confirmation = String::new();
+                        io::stdin()
+                            .read_line(&mut confirmation)
+                            .expect("Failed to read line");
+                        if confirmation.trim().eq_ignore_ascii_case("y") {
+                            println!("  ✅ All IPs will be allowed.");
+                            return Vec::new();
+                        } else {
+                            println!("  Operation cancelled. Please enter at least one IP or CIDR range.");
+                            continue;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                match ip_input.parse::<IpNetwork>() {
+                    Ok(_) => {
+                        if !ips.contains(&ip_input) {
+                            ips.push(ip_input);
+                            println!("  ✅ Added.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "  ❌ Error: Invalid IP or CIDR range: {}. Please try again.",
+                            e
+                        );
+                    }
+                }
+            }
+            Err(_) => {
+                eprintln!("Error: Failed to read input.");
+                break;
+            }
+        }
+    }
+    ips
 }
 
 fn get_allowed_paths() -> Vec<String> {
@@ -59,6 +124,11 @@ fn get_allowed_paths() -> Vec<String> {
                 let path = path.trim().to_string();
 
                 if path.is_empty() {
+                    if paths.is_empty() {
+                        println!("  ❌ No paths provided. '/' will be used as the default path.");
+                        paths.push("/".to_string());
+                        println!("  ✅ Added default path: '/'.");
+                    }
                     break;
                 }
 
@@ -72,6 +142,7 @@ fn get_allowed_paths() -> Vec<String> {
 
                 if path.starts_with('/') {
                     if !paths.contains(&path) {
+                        println!("  ✅ Added path: '{}'", path);
                         paths.push(path);
                     }
                 } else {
