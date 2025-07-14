@@ -34,6 +34,13 @@ pub async fn ws_handler(
         error!("Failed to add allowed paths");
         return e.into_response();
     }
+
+    let allowed_ips = params.allowed_ips.clone();
+    if let Err(e) = access_control::add_allowed_ips(&app_state, &client_id, allowed_ips) {
+        error!("Failed to add allowed IPs");
+        return e.into_response();
+    }
+
     ws.on_upgrade(move |socket| handle_websocket(socket, app_state, client_id))
 }
 
@@ -89,4 +96,6 @@ async fn handle_websocket(mut socket: WebSocket, app_state: Arc<AppState>, clien
 
     info!("WebSocket for client_id: {} disconnected.", client_id);
     app_state.active_websockets.remove(&client_id);
+    app_state.allowed_paths.remove(&client_id);
+    app_state.allowed_ips.remove(&client_id);
 }

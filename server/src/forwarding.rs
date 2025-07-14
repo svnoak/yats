@@ -1,13 +1,14 @@
 use crate::models::TunneledRequest;
 use crate::{access_control, AppState};
 use axum::extract::ws::Message;
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::extract::{Path, Query};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use base64::engine::general_purpose;
 use base64::Engine;
 use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use tracing::{error, info};
@@ -21,6 +22,7 @@ async fn handle_forwarding_request(
     body: bytes::Bytes,
     forward_path: String,
     query_params: HashMap<String, String>,
+    remote_ip: IpAddr,
 ) -> Response {
     info!(
         "Forwarding request for client_id: {}, path: {}, method: {}, query_params: {:?}",
@@ -29,6 +31,10 @@ async fn handle_forwarding_request(
         method.as_str(),
         query_params
     );
+
+    if let Err(response) = access_control::is_ip_allowed(&app_state, &client_id, remote_ip) {
+        return response;
+    }
 
     if let Err(response) = access_control::is_path_allowed(&app_state, &client_id, &forward_path) {
         return response.into_response();
@@ -113,6 +119,7 @@ async fn handle_forwarding_request(
 #[axum::debug_handler]
 pub async fn forward_handler(
     State(app_state): State<Arc<AppState>>,
+    ConnectInfo(remote_addr): ConnectInfo<SocketAddr>,
     Path(path): Path<String>,
     Query(query_params): Query<HashMap<String, String>>,
     method: Method,
@@ -131,6 +138,13 @@ pub async fn forward_handler(
         None => "".to_string(),
     };
 
+    let remote_ip = headers
+        .get("X-Forwarded-For")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .and_then(|s| s.trim().parse::<IpAddr>().ok())
+        .unwrap_or(remote_addr.ip());
+
     handle_forwarding_request(
         app_state,
         client_id,
@@ -139,6 +153,7 @@ pub async fn forward_handler(
         body,
         forward_path,
         query_params,
+        remote_ip,
     )
     .await
 }

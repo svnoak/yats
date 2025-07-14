@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use dashmap::DashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -25,6 +26,7 @@ pub struct AppState {
     pub active_websockets: Arc<DashMap<String, tokio::sync::mpsc::Sender<Message>>>,
     pub pending_responses: Arc<DashMap<String, oneshot::Sender<TunneledHttpResponse>>>,
     pub allowed_paths: Arc<DashMap<String, Vec<String>>>,
+    pub allowed_ips: Arc<DashMap<String, Vec<String>>>,
 }
 
 impl AppState {
@@ -35,6 +37,7 @@ impl AppState {
             active_websockets: Arc::new(DashMap::new()),
             pending_responses: Arc::new(DashMap::new()),
             allowed_paths: Arc::new(DashMap::new()),
+            allowed_ips: Arc::new(DashMap::new()),
         }
     }
 }
@@ -54,5 +57,10 @@ async fn main() {
 
     let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("Listening on {}", listener.local_addr().unwrap());
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }

@@ -25,7 +25,7 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Starting Rust Tunnel Client...");
+    info!("Starting Tunnel Client...");
 
     let config = AppConfig::new();
 
@@ -65,11 +65,11 @@ async fn main() {
     let http_client = Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
-        .expect("Failed to build reqwest client");
+        .expect("Failed to build request client");
 
     handle_websocket_messages(ws_receiver, tx, http_client, config).await;
 
-    info!("Rust Tunnel Client shutting down.");
+    info!("Tunnel Client shutting down.");
 }
 
 fn print_tunnel_status(config: &AppConfig) {
@@ -84,10 +84,20 @@ fn print_tunnel_status(config: &AppConfig) {
 
     if config.allowed_paths.is_empty() {
         println!("No public paths are configured. No remote requests will be forwarded.");
+        return;
     } else {
         println!("Requests to:");
         for path in &config.allowed_paths {
             println!("  {}/{}{}", client_public_url_base, config.client_id, path);
+        }
+    }
+
+    if config.allowed_ips.is_empty() {
+        println!("All IPs are allowed to access the tunnel.");
+    } else {
+        println!("Allowed IPs or CIDR ranges:");
+        for ip in &config.allowed_ips {
+            println!("  {}", ip);
         }
     }
 

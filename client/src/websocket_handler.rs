@@ -20,11 +20,17 @@ pub type WsReceiver = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 pub async fn connect_to_websocket(
     config: &AppConfig,
 ) -> Result<(WsSender, WsReceiver), Box<dyn std::error::Error>> {
-    let allowed_paths_query = config.allowed_paths.join(",");
-    let ws_url = Url::parse(&format!(
-        "{}?client_id={}&allowed_paths={}",
-        config.server_ws_url, config.client_id, allowed_paths_query
-    ))?;
+    let mut ws_url = Url::parse(&config.server_ws_url)?;
+    ws_url
+        .query_pairs_mut()
+        .append_pair("client_id", &config.client_id)
+        .append_pair("allowed_paths", &config.allowed_paths.join(","));
+
+    if !config.allowed_ips.is_empty() {
+        ws_url
+            .query_pairs_mut()
+            .append_pair("allowed_ips", &config.allowed_ips.join(","));
+    }
 
     let auth_header_value = format!("Bearer {}", config.secret_token);
     let host = ws_url.host_str().ok_or("Invalid WebSocket URL: no host")?;
@@ -132,6 +138,7 @@ impl Clone for AppConfig {
             secret_token: self.secret_token.clone(),
             target_http_service_url: self.target_http_service_url.clone(),
             allowed_paths: self.allowed_paths.clone(),
+            allowed_ips: self.allowed_ips.clone(),
         }
     }
 }
