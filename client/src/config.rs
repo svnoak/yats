@@ -42,36 +42,74 @@ impl AppConfig {
 }
 
 fn get_allowed_paths() -> Vec<String> {
-    println!("\nEnter the URL paths you want to allow access to from the public URL.");
-    println!("Paths should start with a '/' (e.g., /api/v1/users).");
-    println!("Press Enter on an empty line to finish.");
+    println!("\n▶ Enter the URL paths to allow access to from the public URL.");
+    println!("  - Standard paths should start with a '/' (e.g., /api/v1).");
+    println!("  - To allow the root URL with no trailing slash (e.g., /client-id), type <root>.");
+    println!("  - Press Enter on an empty line to finish.");
 
     let mut paths = Vec::new();
     loop {
-        let mut path = String::new();
         print!("> ");
         io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
-        io::stdin()
-            .read_line(&mut path)
-            .expect("Failed to read line");
-        let path = path.trim().to_string();
 
-        if path.is_empty() {
-            break;
+        let mut path = String::new();
+        match io::stdin().read_line(&mut path) {
+            Ok(0) => break, // EOF, break loop
+            Ok(_) => {
+                let path = path.trim().to_string();
+
+                if path.is_empty() {
+                    break;
+                }
+
+                if path.to_lowercase() == "<root>" {
+                    if !paths.contains(&"".to_string()) {
+                        paths.push("".to_string());
+                        println!("  ✅ Added root path (no trailing slash).");
+                    }
+                    continue;
+                }
+
+                if path.starts_with('/') {
+                    if !paths.contains(&path) {
+                        paths.push(path);
+                    }
+                } else {
+                    loop {
+                        print!(
+                            "  🤔 Warning: The path '{}' is non-standard because it doesn't start with a '/'.\n  Are you sure you want to add it? (y/N): ",
+                            path
+                        );
+                        io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
+
+                        let mut confirmation = String::new();
+                        io::stdin()
+                            .read_line(&mut confirmation)
+                            .expect("Failed to read confirmation");
+
+                        match confirmation.trim().to_lowercase().as_str() {
+                            "y" | "yes" => {
+                                if !paths.contains(&path) {
+                                    paths.push(path.clone());
+                                }
+                                println!("  ✅ Added non-standard path.");
+                                break;
+                            }
+                            "n" | "" => {
+                                println!("  ❌ Path was not added.");
+                                break;
+                            }
+                            _ => println!("  Invalid input. Please enter 'y' or 'n'."),
+                        }
+                    }
+                }
+            }
+            Err(_) => {
+                eprintln!("Error: Failed to read input. Please ensure it's valid UTF-8.");
+                break;
+            }
         }
-
-        if !path.starts_with('/') {
-            println!("Warning: Path '{}' does not start with a '/'. It will be added, but this is not standard.", path);
-        }
-
-        paths.push(path);
     }
-
-    if paths.is_empty() {
-        println!("No paths entered. Defaulting to the root path '/'.");
-        paths.push("/".to_string());
-    }
-
     paths
 }
 
@@ -87,13 +125,13 @@ fn get_target_local_url() -> String {
         match Url::parse(&url_input) {
             Ok(parsed_url) => {
                 if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
-                    eprintln!("Warning: The URL must start with 'http://' or 'https://'. Please try again.");
+                    eprintln!("Error: The URL scheme must be 'http' or 'https'. Please try again.");
                 } else {
                     return url_input;
                 }
             }
             Err(e) => {
-                eprintln!("Invalid URL: {}. Please try again.", e);
+                eprintln!("Error: Invalid URL ({}). Please enter a full URL (e.g., http://localhost:8080).", e);
             }
         }
     }

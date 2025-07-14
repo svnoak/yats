@@ -1,17 +1,13 @@
 use crate::config::AppConfig;
 use crate::http_handler::forward_request_to_local_service;
 use crate::models::{TunneledHttpResponse, TunneledRequest};
-use futures_util::{
-    stream::{SplitSink, SplitStream, StreamExt},
-};
+use futures_util::stream::{SplitSink, SplitStream, StreamExt};
 use reqwest::Client;
 use tokio::net::TcpStream;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::handshake::client::generate_key;
-use tokio_tungstenite::{
-    connect_async, tungstenite, MaybeTlsStream, WebSocketStream,
-};
 use tokio_tungstenite::tungstenite::protocol::Message as WsMessage;
+use tokio_tungstenite::{connect_async, tungstenite, MaybeTlsStream, WebSocketStream};
 use tracing::{debug, error, info};
 use tungstenite::handshake::client::Request;
 use tungstenite::http::header::AUTHORIZATION;
@@ -27,9 +23,7 @@ pub async fn connect_to_websocket(
     let allowed_paths_query = config.allowed_paths.join(",");
     let ws_url = Url::parse(&format!(
         "{}?client_id={}&allowed_paths={}",
-        config.server_ws_url,
-        config.client_id,
-        allowed_paths_query
+        config.server_ws_url, config.client_id, allowed_paths_query
     ))?;
 
     let auth_header_value = format!("Bearer {}", config.secret_token);
@@ -43,10 +37,7 @@ pub async fn connect_to_websocket(
         .header("Connection", "upgrade")
         .header("Sec-Websocket-Key", generate_key())
         .header("Sec-Websocket-Version", "13")
-        .header(
-            AUTHORIZATION,
-            HeaderValue::from_str(&auth_header_value)?,
-        )
+        .header(AUTHORIZATION, HeaderValue::from_str(&auth_header_value)?)
         .body(())?;
 
     info!("Connecting to WebSocket server at {}", ws_url);

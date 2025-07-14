@@ -60,22 +60,7 @@ async fn main() {
         info!("WebSocket sender task shutting down.");
     });
 
-    let client_public_url_base = config
-        .server_ws_url
-        .replace("ws://", "http://")
-        .replace("wss://", "https://")
-        .trim_end_matches("/ws")
-        .to_string();
-
-    println!("\nYour tunnel is active! Requests to:");
-    config.allowed_paths.iter().for_each(|path| {
-        println!("  {}/{}{}", client_public_url_base, config.client_id, path);
-    });
-    
-    println!(
-        "Will be forwarded to your local service at: {}",
-        config.target_http_service_url
-    );
+    print_tunnel_status(&config);
 
     let http_client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -85,4 +70,29 @@ async fn main() {
     handle_websocket_messages(ws_receiver, tx, http_client, config).await;
 
     info!("Rust Tunnel Client shutting down.");
+}
+
+fn print_tunnel_status(config: &AppConfig) {
+    let client_public_url_base = config
+        .server_ws_url
+        .replace("ws://", "http://")
+        .replace("wss://", "https://")
+        .trim_end_matches("/ws")
+        .to_string();
+
+    println!("\n🚀 Your tunnel is active!");
+
+    if config.allowed_paths.is_empty() {
+        println!("No public paths are configured. No remote requests will be forwarded.");
+    } else {
+        println!("Requests to:");
+        for path in &config.allowed_paths {
+            println!("  {}/{}{}", client_public_url_base, config.client_id, path);
+        }
+    }
+
+    println!(
+        "\nWill be forwarded to your local service at: {}",
+        config.target_http_service_url
+    );
 }
