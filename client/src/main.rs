@@ -50,6 +50,20 @@ async fn main() {
         }
     });
 
+    // Handle SIGTERM (Unix only)
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{signal, SignalKind};
+        let tx_sigterm = tx.clone();
+        tokio::spawn(async move {
+            let mut sigterm =
+                signal(SignalKind::terminate()).expect("Failed to install SIGTERM handler");
+            sigterm.recv().await;
+            info!("SIGTERM received, sending Close frame to server...");
+            let _ = tx_sigterm.send(WsMessage::Close(None)).await;
+        });
+    }
+
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
             if let Err(e) = ws_sender.send(message).await {
