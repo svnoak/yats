@@ -65,7 +65,6 @@ pub fn is_ip_allowed(
     remote_ip: IpAddr,
 ) -> Result<(), Response> {
     if let Some(allowed_ips_ref) = app_state.allowed_ips.get(client_id) {
-
         if allowed_ips_ref.is_empty() {
             return Ok(());
         }
