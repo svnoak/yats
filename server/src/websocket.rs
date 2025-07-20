@@ -41,6 +41,12 @@ pub async fn ws_handler(
         return e.into_response();
     }
 
+    let allowed_asns = params.allowed_asns.clone();
+    if let Err(e) = access_control::add_allowed_asns(&app_state, &client_id, allowed_asns) {
+        error!("Failed to add allowed ASNs");
+        return e.into_response();
+    }
+
     ws.on_upgrade(move |socket| handle_websocket(socket, app_state, client_id))
 }
 

@@ -27,6 +27,8 @@ pub struct AppState {
     pub pending_responses: Arc<DashMap<String, oneshot::Sender<TunneledHttpResponse>>>,
     pub allowed_paths: Arc<DashMap<String, Vec<String>>>,
     pub allowed_ips: Arc<DashMap<String, Vec<String>>>,
+    pub allowed_asns: Arc<DashMap<String, Vec<u32>>>,
+    pub db_reader: Arc<maxminddb::Reader<Vec<u8>>>,
 }
 
 impl AppState {
@@ -38,6 +40,11 @@ impl AppState {
             pending_responses: Arc::new(DashMap::new()),
             allowed_paths: Arc::new(DashMap::new()),
             allowed_ips: Arc::new(DashMap::new()),
+            allowed_asns: Arc::new(DashMap::new()),
+            db_reader: Arc::new(
+                maxminddb::Reader::open_readfile(config.asn_db_path)
+                    .expect("Failed to open ASN database"),
+            ),
         }
     }
 }

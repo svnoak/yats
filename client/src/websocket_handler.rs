@@ -32,6 +32,18 @@ pub async fn connect_to_websocket(
             .append_pair("allowed_ips", &config.allowed_ips.join(","));
     }
 
+    if !config.allowed_asns.is_empty() {
+        ws_url.query_pairs_mut().append_pair(
+            "allowed_asns",
+            &config
+                .allowed_asns
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<String>>()
+                .join(","),
+        );
+    }
+
     let auth_header_value = format!("Bearer {}", config.secret_token);
     let host = ws_url.host_str().ok_or("Invalid WebSocket URL: no host")?;
 
@@ -139,6 +151,7 @@ impl Clone for AppConfig {
             target_http_service_url: self.target_http_service_url.clone(),
             allowed_paths: self.allowed_paths.clone(),
             allowed_ips: self.allowed_ips.clone(),
+            allowed_asns: self.allowed_asns.clone(),
         }
     }
 }
