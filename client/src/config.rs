@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub target_http_service_url: String,
     pub allowed_paths: Vec<String>,
     pub allowed_ips: Vec<String>,
+    pub allowed_asns: Vec<u32>,
 }
 
 impl AppConfig {
@@ -35,6 +36,8 @@ impl AppConfig {
 
         let allowed_ips = get_allowed_ips();
 
+        let allowed_asns = get_allowed_asns();
+
         Self {
             server_ws_url,
             client_id,
@@ -42,6 +45,7 @@ impl AppConfig {
             target_http_service_url,
             allowed_paths,
             allowed_ips,
+            allowed_asns,
         }
     }
 }
@@ -205,5 +209,74 @@ fn get_target_local_url() -> String {
                 eprintln!("Error: Invalid URL ({}). Please enter a full URL (e.g., http://localhost:8080).", e);
             }
         }
+    }
+}
+
+fn get_allowed_asns() -> Vec<u32> {
+    println!("\n▶ Enter allowed ASNs for the tunnel (e.g., AS15169).");
+    println!("  - Press Enter on an empty line to finish. If no ASNs are provided, all ASNs will be allowed.");
+
+    let mut asns = Vec::new();
+    loop {
+        print!("> ");
+        io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
+
+        let mut asn_input = String::new();
+        match io::stdin().read_line(&mut asn_input) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                let asn_input = asn_input.trim().to_string();
+                if asn_input.is_empty() {
+                    if asns.is_empty() {
+                        print!("  ⚠️ Are you sure you want to allow all ASNs? This is a security risk. (y/N) ");
+                        io::Write::flush(&mut io::stdout()).expect("Failed to flush stdout");
+                        let mut confirmation = String::new();
+                        io::stdin()
+                            .read_line(&mut confirmation)
+                            .expect("Failed to read line");
+                        if confirmation.trim().eq_ignore_ascii_case("y") {
+                            println!("  ✅ All ASNs will be allowed.");
+                            return Vec::new();
+                        } else {
+                            println!("  Operation cancelled. Please enter at least one ASN.");
+                            continue;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                match validate_asn(&asn_input) {
+                    Ok(ref asn) => {
+                        if !asns.contains(asn) {
+                            asns.push(*asn);
+                            println!("  ✅ Added.");
+                        }
+                    }
+                    Err(e) => eprintln!("  ❌ Error: {e}. Please try again."),
+                }
+            }
+            Err(_) => {
+                eprintln!("Error: Failed to read input.");
+                break;
+            }
+        }
+    }
+    asns
+}
+
+fn validate_asn(asn_str: &str) -> Result<u32, String> {
+    let cleaned = asn_str.trim().to_uppercase();
+
+    let number_str = match cleaned.strip_prefix("AS") {
+        Some(s) => s,
+        None => &cleaned,
+    };
+
+    match number_str.parse::<u32>() {
+        // The size of an ASN can be up to 32 bits
+        Ok(asn) if asn >= 1 => Ok(asn),
+        Ok(_) => Err("ASN out of valid range (1-4294967295)".to_string()),
+        Err(_) => Err("Invalid ASN format".to_string()),
     }
 }

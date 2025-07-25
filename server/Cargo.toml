@@ -20,3 +20,4 @@ dashmap = "5.5.3"
 futures-util = "0.3.30"
 tower-http = { version = "0.5", features = ["trace"] }
 uuid = { version = "1.8.0", features = ["v4"] }
+maxminddb = "0.26.0"

@@ -40,6 +40,10 @@ async fn handle_forwarding_request(
         return response.into_response();
     }
 
+    if let Err(response) = access_control::is_asn_allowed(&app_state, &client_id, remote_ip).await {
+        return response.into_response();
+    }
+
     if let Some(ws_sender) = app_state.active_websockets.get(&client_id) {
         let headers_map: HashMap<String, String> = headers
             .iter()

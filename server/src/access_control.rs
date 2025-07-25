@@ -5,9 +5,10 @@ use axum::{
 };
 use axum_extra::{headers::Authorization, TypedHeader};
 use ipnetwork::IpNetwork;
+use maxminddb::geoip2;
 use std::net::IpAddr;
 use std::sync::Arc;
-use tracing::error;
+use tracing::{error, warn};
 
 pub fn authenticate_client(
     auth_header: Option<TypedHeader<Authorization<axum_extra::headers::authorization::Bearer>>>,
@@ -56,6 +57,15 @@ pub fn add_allowed_paths(
     }
 
     app_state.allowed_paths.insert(client_id.to_string(), paths);
+    Ok(())
+}
+
+pub fn add_allowed_asns(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    asns: Vec<u32>,
+) -> Result<(), Response> {
+    app_state.allowed_asns.insert(client_id.to_string(), asns);
     Ok(())
 }
 
@@ -115,5 +125,48 @@ pub fn is_path_allowed(
             client_id
         );
         Err((StatusCode::NOT_FOUND).into_response())
+    }
+}
+
+pub async fn is_asn_allowed(
+    app_state: &Arc<AppState>,
+    client_id: &str,
+    remote_ip: IpAddr,
+) -> Result<(), impl IntoResponse> {
+    if let Some(allowed_asns_ref) = app_state.allowed_asns.get(client_id) {
+        if allowed_asns_ref.is_empty() {
+            return Ok(());
+        }
+
+        // Allow requests from loopback addresses without further checks.
+        if remote_ip.is_loopback() {
+            return Ok(());
+        }
+
+        let asn = app_state.db_reader.lookup::<geoip2::Asn>(remote_ip);
+
+        let asn = asn
+            .inspect_err(|_e| error!("Error while doing ASN lookup. IP: {remote_ip}"))
+            .map_err(|_e| (StatusCode::NOT_FOUND, "No ASN found for the given IP").into_response())?
+            .ok_or_else(|| {
+                warn!("No ASN connected to IP: {remote_ip}");
+                (StatusCode::NOT_FOUND, "No ASN found for the given IP").into_response()
+            })?
+            .autonomous_system_number
+            .ok_or_else(|| {
+                warn!("ASN number is None for IP: {remote_ip}");
+                (StatusCode::NOT_FOUND, "No ASN found for the given IP").into_response()
+            })?;
+
+        let is_allowed = allowed_asns_ref.iter().any(|p| p == &asn);
+
+        if is_allowed {
+            Ok(())
+        } else {
+            error!("Asn '{asn}' is not in the allowed list for client_id '{client_id}'");
+            Err((StatusCode::FORBIDDEN, "ASN not allowed").into_response())
+        }
+    } else {
+        Ok(())
     }
 }
