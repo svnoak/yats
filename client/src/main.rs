@@ -1,4 +1,5 @@
 mod config;
+mod config_manager;
 mod http_handler;
 mod models;
 mod utils;
@@ -6,6 +7,7 @@ mod websocket_handler;
 
 use crate::websocket_handler::handle_websocket_messages;
 use config::AppConfig;
+use config_manager::load_configs;
 use futures_util::SinkExt;
 use reqwest::Client;
 use std::time::Duration;
@@ -27,7 +29,26 @@ async fn main() {
 
     info!("Starting Tunnel Client...");
 
-    let config = AppConfig::new();
+    // Load existing configurations from file.
+    let mut stored_configs = load_configs().unwrap_or_else(|e| {
+        info!(
+            "Could not load configs (this is normal on first run): {}",
+            e
+        );
+        std::collections::HashMap::new()
+    });
+
+    // Let the config module handle the user interaction for getting a configuration.
+    let config = match config::get_or_create_config(&mut stored_configs).await {
+        Some(config) => config,
+        None => {
+            // User chose to exit.
+            info!("Exiting client.");
+            return;
+        }
+    };
+
+    // --- The rest of the application logic proceeds with the chosen config ---
 
     let (mut ws_sender, ws_receiver) = match connect_to_websocket(&config).await {
         Ok((sender, receiver)) => (sender, receiver),
@@ -112,6 +133,14 @@ fn print_tunnel_status(config: &AppConfig) {
         println!("Allowed IPs or CIDR ranges:");
         for ip in &config.allowed_ips {
             println!("  {}", ip);
+        }
+    }
+    if config.allowed_asns.is_empty() {
+        println!("All ASNs are allowed to access the tunnel.");
+    } else {
+        println!("Allowed ASNs:");
+        for asn in &config.allowed_asns {
+            println!("  AS{}", asn);
         }
     }
 
