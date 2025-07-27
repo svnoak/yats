@@ -29,7 +29,6 @@ async fn main() {
 
     info!("Starting Tunnel Client...");
 
-    // Load existing configurations from file.
     let mut stored_configs = load_configs().unwrap_or_else(|e| {
         info!(
             "Could not load configs (this is normal on first run): {}",
@@ -38,7 +37,6 @@ async fn main() {
         std::collections::HashMap::new()
     });
 
-    // Let the config module handle the user interaction for getting a configuration.
     let config = match config::get_or_create_config(&mut stored_configs).await {
         Some(config) => config,
         None => {
@@ -47,8 +45,6 @@ async fn main() {
             return;
         }
     };
-
-    // --- The rest of the application logic proceeds with the chosen config ---
 
     let (mut ws_sender, ws_receiver) = match connect_to_websocket(&config).await {
         Ok((sender, receiver)) => (sender, receiver),
