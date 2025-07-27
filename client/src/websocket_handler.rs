@@ -23,7 +23,11 @@ pub async fn connect_to_websocket(
     let mut ws_url = Url::parse(&config.server_ws_url)?;
     ws_url
         .query_pairs_mut()
-        .append_pair("client_id", &config.client_id)
+        .append_pair("client_id", &config.client_id);
+
+    // The server should handle empty paths correctly, so we always send the parameter.
+    ws_url
+        .query_pairs_mut()
         .append_pair("allowed_paths", &config.allowed_paths.join(","));
 
     if !config.allowed_ips.is_empty() {
@@ -138,20 +142,6 @@ pub async fn handle_websocket_messages(
                     _ => {}
                 }
             }
-        }
-    }
-}
-
-impl Clone for AppConfig {
-    fn clone(&self) -> Self {
-        Self {
-            server_ws_url: self.server_ws_url.clone(),
-            client_id: self.client_id.clone(),
-            secret_token: self.secret_token.clone(),
-            target_http_service_url: self.target_http_service_url.clone(),
-            allowed_paths: self.allowed_paths.clone(),
-            allowed_ips: self.allowed_ips.clone(),
-            allowed_asns: self.allowed_asns.clone(),
         }
     }
 }

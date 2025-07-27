@@ -1,9 +1,17 @@
+use crate::config_manager::save_configs;
 use crate::utils::{generate_random_id_phrase, get_input_with_default};
 use dotenvy::dotenv;
 use ipnetwork::IpNetwork;
-use std::{env, io};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::{
+    env,
+    io::{self, Write},
+};
+use tracing::{error, info};
 use url::Url;
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppConfig {
     pub server_ws_url: String,
     pub client_id: String,
@@ -14,41 +22,176 @@ pub struct AppConfig {
     pub allowed_asns: Vec<u32>,
 }
 
-impl AppConfig {
-    pub fn new() -> Self {
-        dotenv().ok();
+/// The main entry point for configuration.
+/// It determines whether to show a creation wizard or the selection menu.
+pub async fn get_or_create_config(
+    stored_configs: &mut HashMap<String, AppConfig>,
+) -> Option<AppConfig> {
+    if stored_configs.is_empty() {
+        // Flow for first-time run or no saved configs
+        println!("\n--- Tunnel Client Setup ---");
+        println!("No saved configurations found. Let's create a new one.");
+        let new_config = gather_new_config();
 
-        let server_ws_url_default =
-            env::var("SERVER_WS_URL").unwrap_or_else(|_| "ws://localhost:3000/ws".to_string());
-        let server_ws_url =
-            get_input_with_default("Enter Tunnel Server URL", &server_ws_url_default);
+        print!("\nDo you want to save this configuration for future use? (y/N): ");
+        io::stdout().flush().unwrap();
+        let mut save_choice = String::new();
+        io::stdin().read_line(&mut save_choice).unwrap();
 
-        let client_id_default = generate_random_id_phrase();
-        let client_id = get_input_with_default("Choose Client ID", &client_id_default);
+        if save_choice.trim().eq_ignore_ascii_case("y") {
+            prompt_and_save_config_name(stored_configs, &new_config);
+        }
+        Some(new_config)
+    } else {
+        // Flow for when saved configs exist
+        select_or_create_config(stored_configs).await
+    }
+}
 
-        let secret_token_default =
-            env::var("SECRET_TOKEN").unwrap_or_else(|_| "your_secret_token".to_string());
-        let secret_token = get_input_with_default("Enter Secret Token", &secret_token_default);
+/// Manages the user menu for selecting, creating, or deleting configurations.
+async fn select_or_create_config(
+    stored_configs: &mut HashMap<String, AppConfig>,
+) -> Option<AppConfig> {
+    loop {
+        println!("\n--- Tunnel Client Configuration ---");
+        println!("Available configurations:");
+        let mut sorted_keys: Vec<_> = stored_configs.keys().collect();
+        sorted_keys.sort();
 
-        let target_http_service_url = get_target_local_url();
+        if stored_configs.is_empty() {
+            println!("\n- None. Please create a new configuration.");
+        } else {
+            for (i, name) in sorted_keys.iter().enumerate() {
+                println!("  {}. {}", i + 1, name);
+            }
+        }
 
-        let allowed_paths = get_allowed_paths();
+        println!("\nOptions:");
+        println!("  c - Create a new configuration");
+        println!("  d - Delete a configuration");
+        println!("  q - Quit");
+        print!("\nEnter a number to use a config, or choose an option: ");
+        io::stdout().flush().unwrap();
 
-        let allowed_ips = get_allowed_ips();
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice).unwrap();
+        let choice = choice.trim();
 
-        let allowed_asns = get_allowed_asns();
+        match choice {
+            "c" => {
+                let new_config = gather_new_config();
+                print!("\nDo you want to save this new configuration? (y/N): ");
+                io::stdout().flush().unwrap();
+                let mut save_choice = String::new();
+                io::stdin().read_line(&mut save_choice).unwrap();
 
-        Self {
-            server_ws_url,
-            client_id,
-            secret_token,
-            target_http_service_url,
-            allowed_paths,
-            allowed_ips,
-            allowed_asns,
+                if save_choice.trim().eq_ignore_ascii_case("y") {
+                    prompt_and_save_config_name(stored_configs, &new_config);
+                }
+                return Some(new_config);
+            }
+            "d" => {
+                print!("Enter the number of the configuration to delete: ");
+                io::stdout().flush().unwrap();
+                let mut del_choice = String::new();
+                io::stdin().read_line(&mut del_choice).unwrap();
+                if let Ok(num) = del_choice.trim().parse::<usize>() {
+                    if num > 0 && num <= sorted_keys.len() {
+                        let key_to_remove = sorted_keys[num - 1].clone();
+                        stored_configs.remove(&key_to_remove);
+                        if let Err(e) = save_configs(stored_configs) {
+                            error!("Failed to save changes: {}", e);
+                        } else {
+                            println!("Configuration '{}' deleted.", key_to_remove);
+                        }
+                    } else {
+                        println!("Invalid number.");
+                    }
+                } else {
+                    println!("Invalid input.");
+                }
+            }
+            "q" => return None,
+            _ => {
+                if let Ok(num) = choice.parse::<usize>() {
+                    if num > 0 && num <= sorted_keys.len() {
+                        let key = sorted_keys[num - 1];
+                        return Some(stored_configs.get(key).unwrap().clone());
+                    }
+                }
+                println!("Invalid selection. Please try again.");
+            }
         }
     }
 }
+
+/// Gathers all configuration details interactively from the user.
+fn gather_new_config() -> AppConfig {
+    dotenv().ok();
+
+    let server_ws_url_default =
+        env::var("SERVER_WS_URL").unwrap_or_else(|_| "ws://localhost:3000/ws".to_string());
+    let server_ws_url = get_input_with_default("Enter Tunnel Server URL", &server_ws_url_default);
+
+    let client_id_default = generate_random_id_phrase();
+    let client_id = get_input_with_default("Choose Client ID", &client_id_default);
+
+    let secret_token_default =
+        env::var("SECRET_TOKEN").unwrap_or_else(|_| "your_secret_token".to_string());
+    let secret_token = get_input_with_default("Enter Secret Token", &secret_token_default);
+
+    let target_http_service_url = get_target_local_url();
+    let allowed_paths = get_allowed_paths();
+    let allowed_ips = get_allowed_ips();
+    let allowed_asns = get_allowed_asns();
+
+    AppConfig {
+        server_ws_url,
+        client_id,
+        secret_token,
+        target_http_service_url,
+        allowed_paths,
+        allowed_ips,
+        allowed_asns,
+    }
+}
+
+/// Prompts the user for a configuration name and saves the configuration if valid.
+fn prompt_and_save_config_name(
+    stored_configs: &mut HashMap<String, AppConfig>,
+    new_config: &AppConfig,
+) {
+    loop {
+        print!("Enter a name for this configuration: ");
+        io::stdout().flush().unwrap();
+        let mut config_name = String::new();
+        io::stdin().read_line(&mut config_name).unwrap();
+        let config_name = config_name.trim().to_string();
+
+        if config_name.is_empty() {
+            println!("Configuration name cannot be empty. Please try again.");
+            continue;
+        }
+        if stored_configs.contains_key(&config_name) {
+            println!(
+                "Configuration name '{}' already exists. Please choose a different name.",
+                config_name
+            );
+            continue;
+        }
+
+        stored_configs.insert(config_name.clone(), new_config.clone());
+        if let Err(e) = save_configs(stored_configs) {
+            error!("Failed to save configuration: {}", e);
+        } else {
+            info!("Configuration '{}' saved.", config_name);
+        }
+
+        break;
+    }
+}
+
+// --- Helper functions for gathering input ---
 
 fn get_allowed_ips() -> Vec<String> {
     println!(
