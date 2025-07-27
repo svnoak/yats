@@ -34,7 +34,7 @@ pub fn spawn_asn_updater_task(app_state: Arc<AppState>) {
         // The scheduler loop. It will run pending jobs and then sleep.
         loop {
             scheduler.run_pending().await;
-            tokio::time::sleep(Duration::from_secs(3600)).await;
+            tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });
 }
