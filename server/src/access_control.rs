@@ -105,7 +105,7 @@ pub fn is_path_allowed(
     if let Some(allowed_paths_ref) = app_state.allowed_paths.get(client_id) {
         if allowed_paths_ref.is_empty() {
             error!("No allowed paths configured for client_id '{}'.", client_id);
-            return Err((StatusCode::NOT_FOUND).into_response());
+            return Err(StatusCode::NOT_FOUND.into_response());
         }
 
         let is_allowed = allowed_paths_ref.iter().any(|p| p == requested_path);
@@ -117,14 +117,14 @@ pub fn is_path_allowed(
                 "Path '{}' is not in the allowed list for client_id '{}'",
                 requested_path, client_id
             );
-            Err((StatusCode::NOT_FOUND).into_response())
+            Err(StatusCode::NOT_FOUND.into_response())
         }
     } else {
         error!(
             "No path configuration found for client_id '{}'. It may be disconnected.",
             client_id
         );
-        Err((StatusCode::NOT_FOUND).into_response())
+        Err(StatusCode::NOT_FOUND.into_response())
     }
 }
 
@@ -143,7 +143,8 @@ pub async fn is_asn_allowed(
             return Ok(());
         }
 
-        let asn = app_state.db_reader.lookup::<geoip2::Asn>(remote_ip);
+        let reader_guard = app_state.db_reader.read().await;
+        let asn = reader_guard.lookup::<geoip2::Asn>(remote_ip);
 
         let asn = asn
             .inspect_err(|_e| error!("Error while doing ASN lookup. IP: {remote_ip}"))

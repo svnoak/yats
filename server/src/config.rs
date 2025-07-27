@@ -5,6 +5,7 @@ pub struct Config {
     pub secret_token: String,
     pub is_production: bool,
     pub asn_db_path: PathBuf,
+    pub maxmind_license_key: String,
 }
 
 impl Config {
@@ -17,10 +18,13 @@ impl Config {
         let asn_db_path: PathBuf = env::var("ASN_DB_PATH")
             .map(PathBuf::from)
             .unwrap_or(PathBuf::from("asn-test.mmdb"));
+        let maxmind_license_key =
+            std::env::var("MAXMIND_LICENSE_KEY").expect("MAXMIND_LICENSE_KEY must be set");
         Self {
             secret_token,
             is_production,
             asn_db_path,
+            maxmind_license_key,
         }
     }
 }

@@ -17,7 +17,11 @@ axum = { version = "0.7.5", features = ["ws", "macros"] }
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
 bytes = "1.6.0"
 dashmap = "5.5.3"
-futures-util = "0.3.30"
-tower-http = { version = "0.5", features = ["trace"] }
 uuid = { version = "1.8.0", features = ["v4"] }
 maxminddb = "0.26.0"
+clokwerk = "0.4.0"
+chrono = "0.4.41"
+reqwest = { version = "0.12.22", features = ["blocking"] }
+sha256 = "1.6.0"
+flate2 = "1.1.2"
+tar = "0.4.44"
